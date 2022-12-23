@@ -87,6 +87,7 @@ export interface MultiSliderProps {
     allowOverlap?: boolean;
     snapped?: boolean;
     smoothSnapped?: boolean;
+    moveOnTap?: boolean;
     markerOffsetX?: number;
     markerOffsetY?: number;
     minMarkerOverlapDistance?: number;

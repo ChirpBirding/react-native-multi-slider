@@ -50,6 +50,7 @@ export default class MultiSlider extends React.Component {
     allowOverlap: false,
     snapped: false,
     smoothSnapped: false,
+    moveOnTap: false,
     vertical: false,
     minMarkerOverlapDistance: 0,
     minMarkerOverlapStepDistance: 0,
@@ -68,7 +69,11 @@ export default class MultiSlider extends React.Component {
       );
     }
 
-    this.optionsArray =
+    if(this.props.moveOnTap && this.props.values.length > 1) {
+      console.error("enabling moveOnTap with values.length > 1 is not supported.")
+    }
+
+    this.optionsArray = 
       this.props.optionsArray ||
       createArray(this.props.min, this.props.max, this.props.step);
     this.stepLength = this.props.sliderLength / (this.optionsArray.length - 1);
@@ -115,7 +120,10 @@ export default class MultiSlider extends React.Component {
       pastTwo: initialValues[1],
       positionOne: initialValues[0],
       positionTwo: initialValues[1],
+      containerOffsets: {x:null,y:null} 
     };
+
+    this._container = null;
 
     this.subscribePanResponder();
   }
@@ -127,7 +135,7 @@ export default class MultiSlider extends React.Component {
         onStartShouldSetPanResponderCapture: (evt, gestureState) => true,
         onMoveShouldSetPanResponder: (evt, gestureState) => true,
         onMoveShouldSetPanResponderCapture: (evt, gestureState) => true,
-        onPanResponderGrant: (evt, gestureState) => start(),
+        onPanResponderGrant: (evt, gestureState) => start(gestureState),
         onPanResponderMove: (evt, gestureState) => move(gestureState),
         onPanResponderTerminationRequest: (evt, gestureState) => false,
         onPanResponderRelease: (evt, gestureState) => end(gestureState),
@@ -163,12 +171,65 @@ export default class MultiSlider extends React.Component {
     );
   };
 
-  startOne = () => {
+  startOne = (gestureState) => {
     if (this.props.enabledOne) {
       this.props.onValuesChangeStart();
       this.setState({
         onePressed: !this.state.onePressed,
       });
+
+      if (this.props.moveOnTap) {
+        var tapPosition = this.props.vertical
+          ? gestureState.y0
+          : gestureState.x0;
+
+        var offset = this.props.vertical 
+          ? this.state.containerOffsets.y
+          : this.state.containerOffsets.x ;
+
+        var tapPositionRelativeToContainer = this.props.vertical 
+          ? this.props.sliderLength - (tapPosition - offset)
+          : (tapPosition- offset) - this.props.markerSize / 2;
+
+        var bottom = this.props.markerSize / 2;
+        var trueTop =
+          this.state.positionTwo -
+          (this.props.allowOverlap
+            ? 0
+            : this.props.minMarkerOverlapDistance > 0
+            ? this.props.minMarkerOverlapDistance
+            : (this.props.minMarkerOverlapStepDistance || 1) * this.stepLength);
+        var top =
+          trueTop === 0
+            ? 0
+            : trueTop || this.props.sliderLength - this.props.markerSize / 2;
+        var confined =
+          tapPositionRelativeToContainer < bottom ? bottom : tapPositionRelativeToContainer > top ? top : tapPositionRelativeToContainer;
+
+          console.log({offset, confined, tapPosition, c:this.state.containerOffsets})
+
+        var value = positionToValue(confined, this.optionsArray, this.props.sliderLength, this.props.markerSize)
+
+        this.setState(
+          {
+            valueOne: value,
+            positionOne: tapPositionRelativeToContainer,
+            pastOne:  tapPositionRelativeToContainer,
+          }, 
+          () => {
+            var change = [this.state.valueOne];
+            if (this.state.valueTwo) {
+              change.push(this.state.valueTwo);
+            }
+            this.props.onValuesChange(change);
+
+            this.props.onMarkersPosition([
+              this.state.positionOne,
+              this.state.positionTwo,
+            ]);
+          },
+          )
+      }
     }
   };
 
@@ -384,6 +445,8 @@ export default class MultiSlider extends React.Component {
       positionTwo: prevPositionTwo,
     } = prevState;
 
+    this._container = null;
+
     const { positionOne, positionTwo } = this.state;
 
     if (
@@ -547,7 +610,8 @@ export default class MultiSlider extends React.Component {
 
     const body = (
       <React.Fragment>
-        <View style={[styles.fullTrack, { width: sliderLength }]}>
+        <View style={[styles.fullTrack, { width: sliderLength }]} ref={component => this._container = component}
+        >
           <View
             style={[
               styles.track,
@@ -587,7 +651,7 @@ export default class MultiSlider extends React.Component {
             <View
               style={[styles.touch, touchStyle]}
               ref={component => (this._markerOne = component)}
-              {...this._panResponderOne.panHandlers}
+              {...this.props.moveOnTap ? {} : this._panResponderOne.panHandlers }
             >
               {isMarkersSeparated === false ? (
                 <Marker
@@ -658,7 +722,13 @@ export default class MultiSlider extends React.Component {
     );
 
     return (
-      <View testID={this.props.testID}>
+      <View testID={this.props.testID} 
+        onLayout={({nativeEvent}) =>{
+          var {x,y} = nativeEvent.layout;
+          this.setState({containerOffsets: {x,y}}) 
+        }}
+        {...this.props.moveOnTap ? this._panResponderOne.panHandlers : {}}
+        >
         {this.props.enableLabel && (
           <Label
             oneMarkerValue={this.state.valueOne}
@@ -680,7 +750,8 @@ export default class MultiSlider extends React.Component {
           </ImageBackground>
         )}
         {!this.props.imageBackgroundSource && (
-          <View style={containerStyle}>{body}</View>
+          <View style={containerStyle}
+          >{body}</View>
         )}
       </View>
     );
