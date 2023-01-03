@@ -87,6 +87,9 @@ export interface MultiSliderProps {
     allowOverlap?: boolean;
     snapped?: boolean;
     smoothSnapped?: boolean;
+    /**
+     * possibly not working with vertical sliders sometimes when this is true
+     */
     moveOnTap?: boolean;
     markerOffsetX?: number;
     markerOffsetY?: number;
