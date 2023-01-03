@@ -206,7 +206,6 @@ export default class MultiSlider extends React.Component {
         var confined =
           tapPositionRelativeToContainer < bottom ? bottom : tapPositionRelativeToContainer > top ? top : tapPositionRelativeToContainer;
 
-          console.log({offset, confined, tapPosition, c:this.state.containerOffsets})
 
         var value = positionToValue(confined, this.optionsArray, this.props.sliderLength, this.props.markerSize)
 
